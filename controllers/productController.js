@@ -3,60 +3,68 @@ const { CheckVoltage } = require("../check/CheckVoltage");
 const { ChecktypePin } = require("../check/ChecktypePin");
 const { CallNhaCCByCode } = require("../db/nhacc");
 const { decodeBatteryCode } = require("../check/checkDate");
-const getProducts = async (req, res) => {
-  const sql = "SELECT * FROM products";
-  try {
-    const results = await queryAsync(sql);
-    res.status(200).json(results);
-  } catch (err) {
-    console.error("Error retrieving products:", err);
-    res.status(500).send("Error retrieving products.");
-  }
-};
+
 
 const getProductByCode = async (req, res) => {
-  const { code } = req.params; // Using params for code in the URL
+  const { code } = req.params;
 
   if (!code) {
     return res.status(400).send("Product code is required.");
   }
-  const parts = code.split("");
-
-  // Giải mã các phần của mã QR
-  const brandCode = parts.slice(0, 3).join(""); // 3 ký tự đầu tiên: Thương hiệu
-  const typeCode = parts[3]; // Ký tự thứ 4: Loại pin (C, P, M)
-  const voltageCode = parts[4]; // Ký tự thứ 5: Điện áp (B hoặc E)
-  dataOut = {
-    brand: await CallNhaCCByCode(brandCode),
-    type: ChecktypePin(typeCode),
-    voltage: CheckVoltage(voltageCode),
-    date: decodeBatteryCode(code),
-  };
-
-  const sql = `
-    SELECT p.code, p.info AS product_info, cp.info AS content_info
-    FROM products p
-    JOIN content_product cp ON p.id_content_product = cp.id
-    WHERE p.code = ?`;
 
   try {
+    // Kiểm tra mã sản phẩm hợp lệ và tách các phần
+    if (code.length < 5) {
+      return res.status(400).send("Invalid product code format.");
+    }
+
+    const parts = code.split("");
+    const brandCode = parts.slice(0, 3).join(""); // 3 ký tự đầu: mã nhà cung cấp
+    const typeCode = parts[3]; // loại pin
+    const voltageCode = parts[4]; // mã điện áp
+
+    // Gọi hàm kiểm tra nhà cung cấp, nếu không tìm thấy thì trả lỗi
+    const brand = await CallNhaCCByCode(brandCode);
+    if (!brand) {
+      return brand= null;
+    }
+
+    // Kiểm tra loại pin và điện áp
+    const type = ChecktypePin(typeCode);
+    const voltage = CheckVoltage(voltageCode);
+    const date = decodeBatteryCode(code);
+
+    const sql = `
+      SELECT p.code, p.info AS product_info, cp.info AS content_info
+      FROM products p
+      JOIN content_product cp ON p.id_content_product = cp.id
+      WHERE p.code = ?`;
+
     const result = await queryAsync(sql, [code]);
 
+    const dataOut = {
+      brand,
+      type,
+      voltage,
+      date,
+    };
+
     if (result.length > 0) {
-      const productInfo = result[0].product_info; // Product info from the products table
-      const contentInfo = result[0].content_info; // Content info from content_product
+      const productInfo = result[0].product_info || "";
+      const contentInfo = result[0].content_info || "";
 
-      // Optional: Split and process contentInfo if needed
-      const contentKeys = contentInfo.split(" "); // Assuming content_info contains keys split by spaces
-      const productInfoArray = productInfo.split(" ");
+      const contentKeys = contentInfo.split("||");
+      const productInfoArray = productInfo.split("||");
 
-      let combinedInfo = {};
-
+      const combinedInfo = {};
       contentKeys.forEach((key, index) => {
         combinedInfo[key] = productInfoArray[index] || null;
       });
-      dataOut.combined_info = combinedInfo; // This is a merged object containing the information
+
+      dataOut.contentKeys = contentKeys;
+      dataOut.combined_info = combinedInfo;
     }
+
     res.status(200).json(dataOut);
   } catch (err) {
     console.error("Error fetching product by code:", err);
@@ -66,5 +74,5 @@ const getProductByCode = async (req, res) => {
 
 module.exports = {
   getProducts,
-  getProductByCode, // Add the new function here
+  getProductByCode,
 };

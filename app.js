@@ -2,16 +2,18 @@ const express = require("express");
 const cors = require("cors");
 const productRoutes = require("./routes/productRoutes");
 const excelRoutes = require("./routes/excelRoutes");
+require('dotenv').config();
 
 const app = express();
 
-const corsOptions = {
-  origin: ["*", "http://localhost"], // Allow requests from this origin
-  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
-};
-app.use(cors(corsOptions));
 
 app.use(express.json());
+
+const corsOptions = {
+  origin: ["163.61.110.234"], 
+  optionsSuccessStatus: 200, 
+};
+app.use(cors(corsOptions));
 
 // Routes
 app.use("/products", productRoutes);

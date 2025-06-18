@@ -14,7 +14,7 @@ const processDataAndInsertIntoDB = (data, codeColumn) => {
     let mergedInfo = "";
     Object.keys(row).forEach((key) => {
       if (key !== codeColumn) {
-        mergedInfo += row[key] + " ";
+        mergedInfo += row[key] + "||";
       }
     });
     return {
